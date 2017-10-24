@@ -4,10 +4,16 @@
              [json-reader :refer [features-from-stream file-stream]]
              [processor :as processor :refer [consume shutdown]]
              [persistence :as pers]
-             [generator :refer [random-json-feature-stream]]]
+             [generator :refer [random-json-feature-stream]]
+             [workers]]
             [clojure.tools.cli :refer [parse-opts]]
             [clojure.tools.logging :as log])
-  (:gen-class))
+  (:gen-class)
+  (:import (com.netflix.conductor.client.http TaskClient)
+           (com.netflix.conductor.client.worker Worker)
+           (com.netflix.conductor.common.metadata.tasks Task TaskResult TaskResult$Status)
+           (com.netflix.conductor.client.task WorkflowTaskCoordinator$Builder)
+           (pdok.featured.workers FeaturedWorker)))
 
 (declare cli-options features-from-files)
 
@@ -72,6 +78,16 @@
       (fix-fn processor perform?)
       (processor/shutdown processor))))
 
+(defn run-client []
+  (let [client (doto (TaskClient.)
+                 (.setRootURI (:conductor-api-root config/env)))
+        coordinator (.build (doto (WorkflowTaskCoordinator$Builder.)
+                              (.withWorkers [(FeaturedWorker. "featured")])
+                              (.withThreadCount (config/env :thread-count 1))
+                              (.withTaskClient client)))]
+    (.init coordinator)))
+
+
 (defn -main [& args]
 ;  (println "ENV-test" (config/env :pdok-test))
   (let [{:keys [options arguments summary]} (parse-opts args cli-options)]
@@ -80,6 +96,8 @@
         (exit 0 summary)
       (:version options)
         (exit 0 (implementation-version))
+      (:conductor-client options)
+       (run-client)
       (:fix options)
         (if (not (:dataset options))
           (exit 1 "fix requires dataset")
@@ -97,7 +115,8 @@
           (process (assoc options :json-files files))))))
 
 (def cli-options
-  [[nil "--std-in" "Read from std-in"]
+  [[nil "--conductor-client" "Run conductor client"]
+   [nil "--std-in" "Read from std-in"]
    ["-d" "--dataset DATASET" "dataset"]
    [nil "--changelog-dir DIRECTORY" "Changelogs directory, defaults to [execution-dir/user.dir]/changelogs"]
    [nil "--no-timeline"]
