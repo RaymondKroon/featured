@@ -24,8 +24,8 @@
                  [com.fasterxml.uuid/java-uuid-generator "3.1.3"
                   :exclusions [[log4j]]]
                  [com.microsoft.azure/azure-storage "6.0.0"]
-                 [com.netflix.conductor/conductor-common "1.8.0" ]
-                 [com.netflix.conductor/conductor-client "1.8.0" ]
+                 [com.netflix.conductor/conductor-common "1.8.2-rc3" ]
+                 [com.netflix.conductor/conductor-client "1.8.2-rc3" ]
                  [compojure "1.4.0" :exclusions [[org.clojure/tools.reader]]]
                  [stencil "0.4.0"]
                  [environ "1.0.1"]

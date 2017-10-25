@@ -81,10 +81,11 @@
 (defn run-client []
   (let [client (doto (TaskClient.)
                  (.setRootURI (:conductor-api-root config/env)))
-        coordinator (.build (doto (WorkflowTaskCoordinator$Builder.)
-                              (.withWorkers [(FeaturedWorker. "featured")])
-                              (.withThreadCount (config/env :thread-count 1))
-                              (.withTaskClient client)))]
+        coordinator (.build (-> (WorkflowTaskCoordinator$Builder.)
+                                (.withWorkers [(FeaturedWorker. "featured")])
+                                (.withThreadCount (Integer/parseInt (config/env :thread-count "1")))
+                                (.withWorkerQueueSize (* 3 (Integer/parseInt (config/env :thread-count "1"))))
+                                (.withTaskClient client)))]
     (.init coordinator)))
 
 
