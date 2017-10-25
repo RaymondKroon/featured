@@ -13,7 +13,7 @@
            (java.io File)
            (java.util.zip ZipFile ZipEntry ZipOutputStream)
            (com.microsoft.azure.storage CloudStorageAccount)
-           (com.microsoft.azure.storage.blob CloudBlobClient CloudBlockBlob)))
+           (com.microsoft.azure.storage.blob CloudBlobClient CloudBlockBlob BlobContainerPublicAccessType BlobContainerPermissions CloudBlobContainer)))
 
 (defn download-uri [^String uri]
   "Copy to tmp file, return handle"
@@ -35,10 +35,15 @@
       (io/copy in out))
     target))
 
-(defn upload [^File file]
+(defn make-public! [^CloudBlobContainer container]
+  (let [permissions (doto (BlobContainerPermissions.) (.setPublicAccess BlobContainerPublicAccessType/CONTAINER))]
+    (.uploadPermissions container permissions)))
+
+(defn upload [dataset ^File file]
   (let [storage-account (CloudStorageAccount/parse (config/env :storage-connection-string))
         client (.createCloudBlobClient storage-account)
-        container (.getContainerReference client (config/env :storage-container "featured-out"))
+        container (.getContainerReference client (str (config/env :storage-container-prefix "featured-out-") dataset))
+        _ (when-not (.exists container) (.create container) (make-public! container))
         blob (.getBlockBlobReference container (.getName file))]
     (with-open [in (io/input-stream file)]
       (.upload blob in (.length file)))
@@ -81,7 +86,7 @@
                   blobs
                   (for [changelog changelogs]
                     (let [file (fs/get-file filestore changelog)
-                          ^CloudBlockBlob uploaded (upload file)]
+                          ^CloudBlockBlob uploaded (upload dataset file)]
                       {"name" (.getName uploaded) "uri" (.getUri uploaded)}))]
               (.put output "files" (doall blobs))))
           (do (.delete local-zip)
