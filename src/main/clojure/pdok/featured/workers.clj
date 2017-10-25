@@ -6,7 +6,8 @@
              [config :as config]
              [persistence :as pers]
              [processor :as processor]]
-            [pdok.featured.json-reader :as reader])
+            [pdok.featured.json-reader :as reader]
+            [clojure.string :as str])
   (:gen-class)
   (:import (com.netflix.conductor.client.worker Worker)
            (com.netflix.conductor.common.metadata.tasks TaskResult$Status TaskResult)
@@ -35,6 +36,9 @@
       (io/copy in out))
     target))
 
+(defn safe-container-name [name]
+  (-> name (str/lower-case) (str/replace #"_" "-")))
+
 (defn make-public! [^CloudBlobContainer container]
   (let [permissions (doto (BlobContainerPermissions.) (.setPublicAccess BlobContainerPublicAccessType/CONTAINER))]
     (.uploadPermissions container permissions)))
@@ -42,7 +46,8 @@
 (defn upload [dataset ^File file]
   (let [storage-account (CloudStorageAccount/parse (config/env :storage-connection-string))
         client (.createCloudBlobClient storage-account)
-        container (.getContainerReference client (str (config/env :storage-container-prefix "featured-out-") dataset))
+        container (.getContainerReference client (safe-container-name
+                                                   (str (config/env :storage-container-prefix "featured-out-") dataset)))
         _ (when-not (.exists container) (.create container) (make-public! container))
         blob (.getBlockBlobReference container (.getName file))]
     (with-open [in (io/input-stream file)]
